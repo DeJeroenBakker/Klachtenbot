@@ -5,6 +5,8 @@ import pandas as pd
 from transformers import AutoTokenizer, AutoModelForSequenceClassification
 import torch
 
+######## FUNCTIES #########
+
 # Laad het Nederlandse toxicity model
 tokenizer = AutoTokenizer.from_pretrained("ml6team/robbert-dutch-base-toxic-comments")
 model = AutoModelForSequenceClassification.from_pretrained("ml6team/robbert-dutch-base-toxic-comments")
@@ -17,28 +19,64 @@ def analyze_toxicity(text):
     toxicity_score = probabilities[0][1].item()  # Probability of toxic class
     print(f"Toxicity: {toxicity_score}")
     return toxicity_score
-    
-def calculate_priority_score(toxicity_score, category, found_keywords, text):
+
+def calculate_priority_score(toxicity_score, category, found_keywords, text, neighborhood_score):
     base_score = 0
-    
+
     # Adjust score based on toxicity
-    if toxicity_score > (tox_threshold*0.5):
-        toxicity_factor = toxicity_score * 5  # Max 3 points for high toxicity
+    if toxicity_score > tox_threshold:
+        toxicity_factor = toxicity_score * 5  # Scale toxicity appropriately
         base_score += toxicity_factor
 
     # Adjust score based on category
     if category in high_priority_categories:
         base_score += 3
-    
-    # Adjust score based on urgent keywords in the full text
-    urgent_keywords = ["gevaarlijk", "onveilig", "spoed", "levensgevaar", "gewond", "overstroming", "brand", "explosie", "instorting", "giftig", "gaslek", "stroomuitval", "ongeluk", "aanrijding", "verwonding", "verstikking", "verdrinking", "bedreiging", "inbraak", "overval", "vandalisme", "agressie", "geweld", "paniek", "evacuatie", "noodsituatie", "ramp", "crisis", "epidemie", "besmetting", "vergiftiging", "ontploffing", "verzakking", "botsing", "calamiteit"]
+
+    # Adjust score based on urgent keywords
+    urgent_keywords = ["gevaarlijk", "onveilig", "spoed", "levensgevaar", "gewond", "overstroming", "brand", 
+                       "explosie", "instorting", "giftig", "gaslek", "stroomuitval", "ongeluk", "aanrijding", 
+                       "verwonding", "verstikking", "verdrinking", "bedreiging", "inbraak", "overval", "vandalisme", 
+                       "agressie", "geweld", "paniek", "evacuatie", "noodsituatie", "ramp", "crisis", "epidemie", 
+                       "besmetting", "vergiftiging", "ontploffing", "verzakking", "botsing", "calamiteit"]
     if any(keyword in text.lower() for keyword in urgent_keywords):
         base_score += 3
 
-    final_score = max(1, min(round(base_score), 10))
+    # Add neighborhood score
+    base_score += neighborhood_score
 
-    # Ensure the score is between 1 and 10
+    # Ensure the final score is between 1 and 10
+    final_score = max(1, min(round(base_score), 10))
     return final_score
+
+
+# Functie: Analyseer klacht
+def analyze_complaint(text, updated_categories, neighborhood_score, tox_threshold=0.5):
+    toxicity_score = analyze_toxicity(text)
+    
+    # Match keywords using the updated categories
+    category_matches = {
+        category: [word for word in keywords if word in text.lower()]
+        for category, keywords in updated_categories.items()
+    }
+
+    # Find the category with the most matches
+    matched_category = max(category_matches, key=lambda category: len(category_matches[category]))
+
+    # Collect relevant keywords
+    relevant_keywords = category_matches[matched_category]
+
+    # Calculate priority score
+    priority_score = calculate_priority_score(toxicity_score, matched_category, relevant_keywords, text, neighborhood_score)
+
+    extra_urgent = toxicity_score > tox_threshold
+    return (
+        f"Klacht over {matched_category}: {', '.join(relevant_keywords)}",
+        matched_category,
+        extra_urgent,
+        relevant_keywords,
+        toxicity_score,
+        priority_score,
+    )
 
 ###############################################
 
@@ -135,60 +173,33 @@ categories = {
 
 ###############################################
 
-# Verkrijg de locatie via ipinfo.io
-def get_location():
-    try:
-        response = requests.get('https://ipinfo.io')
-        data = response.json()
-        location = data.get('city', 'Onbekend')  # Stad, als beschikbaar
-        return location
-    except requests.exceptions.RequestException:
-        return "Locatie onbekend"
+# Lijst van Utrechtse wijken met prioriteitsscores
+default_neighborhoods = {
+    "Binnenstad": 0,
+    "Lombok": 1,
+    "Wittevrouwen": -1,
+    "Oog in Al": -2,
+    "Leidsche Rijn": -1,
+    "Overvecht": 2,
+    "Kanaleneiland": 2,
+    "Zuilen": 1,
+    "Tuindorp": -2,
+    "Hoograven": 1,
+    "Tolsteeg": -1,
+    "Vleuten-De Meern": -1,
+    "Voordorp": -2,
+    "De Uithof (Utrecht Science Park)": 0,
+    "Nieuw Engeland": 1,
+    "Dichterswijk": 0,
+    "Rivierenwijk": 1,
+    "Hoge Weide": -1,
+    "Parkwijk": 0,
+    "Terwijde": -1,
+    "Papendorp": 2,
+    "Elinkwijk": 2,
+}
 
-
-# Functie: Analyseer klacht
-def analyze_complaint(text, updated_categories, tox_threshold=-0.4):
-    
-    toxicity_score = analyze_toxicity(text)
-    
-    # Match keywords using the updated categories
-    category_matches = {
-        category: [word for word in keywords if word in text.lower()]
-        for category, keywords in updated_categories.items()
-    }
-    
-    # Find the category with the most matches
-    matched_category = max(category_matches, key=lambda category: len(category_matches[category]))
-    
-    extra_urgent = toxicity_score > tox_threshold
-    relevant_keywords = [word for word in category_matches[matched_category]]
-    
-    # Calculate priority score based on toxicity and matched keywords
-    priority_score = calculate_priority_score(toxicity_score, matched_category, relevant_keywords, text)
-    
-    if relevant_keywords:
-        return (
-            f"Klacht over {matched_category}: {', '.join(relevant_keywords)}",
-            matched_category,
-            extra_urgent,
-            relevant_keywords,
-            toxicity_score,
-            priority_score,
-        )
-    
-    return (
-        "Algemene klacht ontvangen",
-        "Onbekend",
-        extra_urgent,
-        [],
-        toxicity_score,
-        priority_score,
-    )
-
-###############################################
-
-if 'results' not in st.session_state:
-    st.session_state.results = []
+################## STREAMLIT UI #############################
 
 st.set_page_config(
     page_title="Klachtenbot 1.0",
@@ -199,50 +210,75 @@ st.set_page_config(
 # Streamlit UI
 st.title("🤖 Utrecht Klachtenbot 1.0 🤖")
 
-st.write("Welkom bij **Utrecht Klachtenbot 1.0**. Ik zal ervoor zorgen dat uw klacht zo snel mogelijk afgehandeld wordt.")
-user_input = st.text_area("Voer hier uw klacht voor de gemeente in. Geef alstublieft aan wat uw klacht is en - indien van toepassing - op welke locatie het probleem zich voordoet.", placeholder="Typ hier uw klacht...", height=250)
+st.write("Welkom bij **Utrecht Klachtenbot 1.0**. Door middel van de meest geavanceerde AI zal ik ervoor zorgen dat uw klacht direct bij de juiste persoon komt. Zo zorg ik ervoor dat u zo snel mogelijk geholpen wordt.")
 
-# Verkrijg de locatie
-user_location = get_location()
-
-# Parameters aanpassen
+# Add a header to the sidebar
 st.sidebar.header("Parameters")
-tox_threshold = st.sidebar.slider("Drempel toxiciteitsscore:", min_value=0.0, max_value=1.0, value=0.5, step=0.05)
 
 # Hoge prioriteit categorieën
-st.sidebar.header("Hoge prioriteit categorieën")
-high_priority_categories = st.sidebar.multiselect(
-    "Kies categorieën:",
-    options=list(categories.keys()),
-    default=["Infrastructuur", "Verkeer en Mobiliteit", "Waterbeheer"]
-)
+with st.sidebar.expander("Hoge prioriteit categorieën", expanded=True):  # Collapsed by default
+    high_priority_categories = st.sidebar.multiselect(
+        "Kies categorieën om met hoge prioriteit te behandelen:",
+        options=list(categories.keys()),
+        default=["Infrastructuur", "Verkeer en Mobiliteit", "Waterbeheer"]
+    )
+
+# Toxiciteit aanpassen
+with st.sidebar.expander("Toxiciteit", expanded=False):  # Collapsed by default
+    tox_threshold = st.slider("Drempel toxiciteitsscore:", min_value=0.0, max_value=1.0, value=0.5, step=0.05)
+
+# Create a sidebar section to edit neighborhood scores
+with st.sidebar.expander("Wijkprioriteitsscores", expanded=False):  # Collapsed by default
+    # Make the neighborhood scores editable via sliders
+    edited_neighborhoods = {}
+    for neighborhood, score in default_neighborhoods.items():
+        edited_neighborhoods[neighborhood] = st.slider(
+            f"Prioriteitsscore voor {neighborhood}",
+            min_value=-2,
+            max_value=2,
+            value=score,
+            step=1
+        )
 
 # Sidebar met categorieën en hun trefwoorden
-st.sidebar.header("Trefwoorden per categorie")
-# Geef de mogelijkheid om de trefwoorden per categorie aan te passen
-updated_categories = {}
-for category, words in categories.items():
-    with st.sidebar.expander(f"{category}"):
+with st.sidebar.expander("Trefwoorden per categorie", expanded=False):  # Collapsed by default
+    # Geef de mogelijkheid om de trefwoorden per categorie aan te passen
+    updated_categories = {}
+    for category, words in categories.items():
         updated_keywords = st.text_area(f"Trefwoorden:", value=", ".join(words), height=100)
         updated_categories[category] = [word.strip() for word in updated_keywords.split(",")]
 
+
+# Create results table
+if 'results' not in st.session_state:
+    st.session_state.results = []
+
+
+# Verkrijg de locatie
+user_location = st.selectbox("Kies uw wijk:", options=list(default_neighborhoods.keys()))
+neighborhood_score = edited_neighborhoods[user_location]
+
+# Text box om de klacht in te schrijven
+user_input = st.text_area("Voer hier uw klacht voor de gemeente in. Geef alstublieft aan wat uw klacht is en - indien van toepassing - op welke locatie het probleem zich voordoet.", placeholder="Typ hier uw klacht...", height=250)
+
 # Output
 if user_input:
-    advice, category, extra_urgent, found_keywords, toxicity_score, priority_score  = analyze_complaint(user_input, updated_categories, tox_threshold)
+    advice, category, extra_urgent, found_keywords, toxicity_score, priority_score  = analyze_complaint(user_input, updated_categories, neighborhood_score, tox_threshold)
 
     # Append result to the list
     st.session_state.results.append({
         "klacht": user_input,
-        "plaats": user_location,
+        "wijk": user_location,
         "categorie": category,
-        "prioriteitsscore": priority_score
+        "prioriteitsscore": priority_score,
+        "extra urgentie": extra_urgent
     })
 
     # Show results
     st.header("Analyse")
     st.write(f"**Prioriteitsscore:** {priority_score}/10")
     if extra_urgent:
-        st.write("⚠️ Deze klacht is aangemerkt als zeer dringend. ⚠️")
+        st.write("⚠️ LET OP: deze klacht zeer urgent behandelen wegens dreigende taal. ⚠️")
     st.write(f"**Categorie:** {category}")
     if found_keywords:
         st.write(f"**Herkende trefwoorden:** {', '.join(found_keywords)}")
@@ -251,7 +287,6 @@ if user_input:
 
 else:
     st.write("Druk op Ctrl+Enter om de klacht te analyseren.")
-
 
 # Display results table
 if st.session_state.results:
