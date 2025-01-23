@@ -1,4 +1,4 @@
-nltk.sentiment
+nltk
 nltk
 requests
 transformers
