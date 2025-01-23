@@ -1,9 +1,5 @@
 import streamlit as st
-from nltk.sentiment import SentimentIntensityAnalyzer
-import nltk
 import requests
-from transformers import BertTokenizer, BertForSequenceClassification
-import torch
 import numpy as np
 import pandas as pd
 from transformers import AutoTokenizer, AutoModelForSequenceClassification
