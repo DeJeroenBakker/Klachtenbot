@@ -83,7 +83,7 @@ def analyze_complaint(text, updated_categories, neighborhood_score, tox_threshol
 # Definieer categorieën en trefwoorden
 categories = {
     "Infrastructuur": [
-        "wegen", "straat", "verkeer", "infrastructuur", "borden", "tunnel", "brug", "wegdek", "wegmarkering", 
+        "wegen", "verkeer", "infrastructuur", "borden", "tunnel", "brug", "wegdek", "wegmarkering", 
         "rotonde", "snelweg", "stoeprand", "verkeerslichten", "fietspad", "tegel", "putdeksel", "afsluiting", 
         "fout wegdek", "slecht wegdek", "put", "stoep", "gaten in weg", "werkzaamheden", "wegenis", "wegomlegging", 
         "verkeersregelaar", "belasting", "verkeershinder", "rijstrook", "oever", "bruggen", "kruispunt", 
@@ -245,7 +245,7 @@ with st.sidebar.expander("Trefwoorden per categorie", expanded=False):  # Collap
     # Geef de mogelijkheid om de trefwoorden per categorie aan te passen
     updated_categories = {}
     for category, words in categories.items():
-        updated_keywords = st.text_area(f"Trefwoorden:", value=", ".join(words), height=100)
+        updated_keywords = st.text_area(f"{category}", value=", ".join(words), height=100)
         updated_categories[category] = [word.strip() for word in updated_keywords.split(",")]
 
 
