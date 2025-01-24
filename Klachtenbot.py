@@ -11,6 +11,7 @@ import torch
 tokenizer = AutoTokenizer.from_pretrained("ml6team/robbert-dutch-base-toxic-comments")
 model = AutoModelForSequenceClassification.from_pretrained("ml6team/robbert-dutch-base-toxic-comments")
 
+# Functie: Analyseren van toxiciteit op basis van robBERT-model
 def analyze_toxicity(text):
     inputs = tokenizer(text, return_tensors="pt", truncation=True, padding=True, max_length=512)
     with torch.no_grad():
@@ -20,18 +21,21 @@ def analyze_toxicity(text):
     print(f"Toxicity: {toxicity_score}")
     return toxicity_score
 
+# Functie: Berekenen van de prioriteitsscore
 def calculate_priority_score(toxicity_score, category, found_keywords, text, neighborhood_score):
-    base_score = 0
+    base_score = 2
 
     # Adjust score based on toxicity
     if toxicity_score > tox_threshold:
-        toxicity_factor = toxicity_score * 5  # Scale toxicity appropriately
+        toxicity_factor = toxicity_score * 3  # Scale toxicity appropriately
         base_score += toxicity_factor
 
     # Adjust score based on category
     if category in high_priority_categories:
         base_score += 3
-
+    if category in categories:
+        base_score += 1
+        
     # Adjust score based on urgent keywords
     urgent_keywords = ["gevaarlijk", "onveilig", "spoed", "levensgevaar", "gewond", "overstroming", "brand", 
                        "explosie", "instorting", "giftig", "gaslek", "stroomuitval", "ongeluk", "aanrijding", 
@@ -39,7 +43,7 @@ def calculate_priority_score(toxicity_score, category, found_keywords, text, nei
                        "agressie", "geweld", "paniek", "evacuatie", "noodsituatie", "ramp", "crisis", "epidemie", 
                        "besmetting", "vergiftiging", "ontploffing", "verzakking", "botsing", "calamiteit"]
     if any(keyword in text.lower() for keyword in urgent_keywords):
-        base_score += 3
+        base_score += 2
 
     # Add neighborhood score
     base_score += neighborhood_score
@@ -47,7 +51,6 @@ def calculate_priority_score(toxicity_score, category, found_keywords, text, nei
     # Ensure the final score is between 1 and 10
     final_score = max(1, min(round(base_score), 10))
     return final_score
-
 
 # Functie: Analyseer klacht
 def analyze_complaint(text, updated_categories, neighborhood_score, tox_threshold=0.5):
@@ -62,20 +65,24 @@ def analyze_complaint(text, updated_categories, neighborhood_score, tox_threshol
     # Find the category with the most matches
     matched_category = max(category_matches, key=lambda category: len(category_matches[category]))
 
+    print("Matched Category:", matched_category)
+    print("Matched Keywords:", category_matches[matched_category])
+
+    
     # Collect relevant keywords
     relevant_keywords = category_matches[matched_category]
 
     # Calculate priority score
     priority_score = calculate_priority_score(toxicity_score, matched_category, relevant_keywords, text, neighborhood_score)
 
-    extra_urgent = toxicity_score > tox_threshold
+    threat = toxicity_score > tox_threshold
     return (
         f"Klacht over {matched_category}: {', '.join(relevant_keywords)}",
         matched_category,
-        extra_urgent,
+        threat,
         relevant_keywords,
         toxicity_score,
-        priority_score,
+        priority_score
     )
 
 ###############################################
@@ -124,7 +131,8 @@ categories = {
         "onrustige buurt", "buurtprobleem", "geluidsoverlast speeltuinen", "burenlawaai", "luidruchtige feestjes", 
         "geen privacy", "lawaai van voertuigen", "overlast van bewoners", "lawaai tijdens nacht", "open ramen", 
         "drukte op straat", "ergernis", "overtreding van stilte", "storing wifi", "smog", "overlast van roken", 
-        "lawaai van kinderen", "probleem met afval", "afvaloverlast", "jongerenlawaai", "weergalmende geluiden"
+        "lawaai van kinderen", "probleem met afval", "afvaloverlast", "jongerenlawaai", "weergalmende geluiden",
+        "hangjongeren", "hangjeugd"
     ],
 
     "Groenbeheer": [
@@ -226,6 +234,8 @@ with st.sidebar.expander("Hoge prioriteit categorieën", expanded=True):  # Coll
 # Toxiciteit aanpassen
 with st.sidebar.expander("Toxiciteit", expanded=False):  # Collapsed by default
     tox_threshold = st.slider("Drempel toxiciteitsscore:", min_value=0.0, max_value=1.0, value=0.5, step=0.05)
+include_threats = st.sidebar.checkbox("Als dreigend aangemerkte berichten toevoegen aan resultaten", value=False)
+
 
 # Create a sidebar section to edit neighborhood scores
 with st.sidebar.expander("Wijkprioriteitsscores", expanded=False):  # Collapsed by default
@@ -233,7 +243,7 @@ with st.sidebar.expander("Wijkprioriteitsscores", expanded=False):  # Collapsed 
     edited_neighborhoods = {}
     for neighborhood, score in default_neighborhoods.items():
         edited_neighborhoods[neighborhood] = st.slider(
-            f"Prioriteitsscore voor {neighborhood}",
+            f"{neighborhood}",
             min_value=-2,
             max_value=2,
             value=score,
@@ -263,30 +273,34 @@ user_input = st.text_area("Voer hier uw klacht voor de gemeente in. Geef alstubl
 
 # Output
 if user_input:
-    advice, category, extra_urgent, found_keywords, toxicity_score, priority_score  = analyze_complaint(user_input, updated_categories, neighborhood_score, tox_threshold)
+    advice, category, threat, found_keywords, toxicity_score, priority_score  = analyze_complaint(user_input, updated_categories, neighborhood_score, tox_threshold)
 
-    # Append result to the list
-    st.session_state.results.append({
-        "klacht": user_input,
-        "wijk": user_location,
-        "categorie": category,
-        "prioriteitsscore": priority_score,
-        "extra urgentie": extra_urgent
-    })
+    # Toevoegen aan resultaten op basis van instelling
+    if include_threats or not threat:
+        st.session_state.results.append({
+            "klacht": user_input,
+            "wijk": user_location,  # Voorbeeldwaarde
+            "categorie": category,
+            "prioriteitsscore": priority_score,
+            "dreigend": threat
+        })
 
     # Show results
     st.header("Analyse")
-    st.write(f"**Prioriteitsscore:** {priority_score}/10")
-    if extra_urgent:
-        st.write("⚠️ LET OP: deze klacht zeer urgent behandelen wegens dreigende taal. ⚠️")
-    st.write(f"**Categorie:** {category}")
-    if found_keywords:
-        st.write(f"**Herkende trefwoorden:** {', '.join(found_keywords)}")
-    st.write(f"**Locatie van de indiener:** {user_location}\n\n")
+    if not include_threats and threat:
+        st.write("⚠️ LET OP: deze klacht wordt niet in behandeling genomen wegens dreigende taal. ⚠️")
+    else:
+        st.write(f"**Prioriteitsscore:** {priority_score}/10")
+        if threat and include_threats:
+            st.write("⚠️ LET OP: deze klacht is aangemerkt als dreigend. ⚠️")
+        st.write(f"**Categorie:** {category}")
+        if found_keywords:
+            st.write(f"**Herkende trefwoorden:** {', '.join(found_keywords)}")
+        st.write(f"**Locatie van de indiener:** {user_location}\n\n")
 
 
 else:
-    st.write("Druk op Ctrl+Enter om de klacht te analyseren.")
+    st.write("Druk op Ctrl+Enter of tik rechtsonderin het tekstvak om de klacht te analyseren.")
 
 # Display results table
 if st.session_state.results:
