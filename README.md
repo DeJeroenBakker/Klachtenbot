@@ -11,7 +11,7 @@ It weighs these metrics to calculate a priority score for each complaint.
 All results are temporarily stored in a table. This is reset upon reloading the bot.
 
 ## How to edit parameters
-In the Streamlit app, click the arrow on the top left to change certain parameters of this bot, including:
+In the Streamlit app, click the arrow ``>`` in the top left corner to change certain parameters of this bot, including:
 
 - High priority categories
 - Treshold for toxicity detection
