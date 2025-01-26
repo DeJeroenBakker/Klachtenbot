@@ -65,6 +65,8 @@ def analyze_complaint(text, updated_categories, neighborhood_score, tox_threshol
     # Find the category with the most matches
     matched_category = max(category_matches, key=lambda category: len(category_matches[category]))
 
+    if len(category_matches) == 0:
+        matched_category = "Onbekend"
     print("Matched Category:", matched_category)
     print("Matched Keywords:", category_matches[matched_category])
 
@@ -89,6 +91,8 @@ def analyze_complaint(text, updated_categories, neighborhood_score, tox_threshol
 
 # Definieer categorieën en trefwoorden
 categories = {
+    "Onbekend": [],
+    
     "Infrastructuur": [
         "wegen", "verkeer", "infrastructuur", "borden", "tunnel", "brug", "wegdek", "wegmarkering", 
         "rotonde", "snelweg", "stoeprand", "verkeerslichten", "fietspad", "tegel", "putdeksel", "afsluiting", 
