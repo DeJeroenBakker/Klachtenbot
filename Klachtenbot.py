@@ -33,7 +33,7 @@ def calculate_priority_score(toxicity_score, category, found_keywords, text, nei
     # Adjust score based on category
     if category in high_priority_categories:
         base_score += 3
-    if category in categories:
+    if category in categories and not "Onbekend":
         base_score += 1
         
     # Adjust score based on urgent keywords
