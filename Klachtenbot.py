@@ -5,16 +5,17 @@ import pandas as pd
 from transformers import AutoTokenizer, AutoModelForSequenceClassification
 import torch
 
+device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+
 ######## FUNCTIES #########
 
 # Laad het Nederlandse toxicity model
 tokenizer = AutoTokenizer.from_pretrained("ml6team/robbert-dutch-base-toxic-comments")
 model = AutoModelForSequenceClassification.from_pretrained("ml6team/robbert-dutch-base-toxic-comments")
+model.to(device)  # This works only if model is loaded with real weights, not meta
 
 # Functie: Analyseren van toxiciteit op basis van robBERT-model
 def analyze_toxicity(text):
-    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-    model.to(device)
     inputs = tokenizer(text, return_tensors="pt", truncation=True, padding=True, max_length=512)
     inputs = {k: v.to(device) for k, v in inputs.items()}
     with torch.no_grad():
