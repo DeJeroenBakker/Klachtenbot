@@ -13,13 +13,16 @@ model = AutoModelForSequenceClassification.from_pretrained("ml6team/robbert-dutc
 
 # Functie: Analyseren van toxiciteit op basis van robBERT-model
 def analyze_toxicity(text):
-   inputs = tokenizer(text, return_tensors="pt", truncation=True, padding=True, max_length=512)
-   with torch.no_grad():
+    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    model.to(device)
+    inputs = tokenizer(text, return_tensors="pt", truncation=True, padding=True, max_length=512)
+    inputs = {k: v.to(device) for k, v in inputs.items()}
+    with torch.no_grad():
         outputs = model(**inputs)
-   probabilities = torch.nn.functional.softmax(outputs.logits, dim=-1)
-   toxicity_score = probabilities[0][1].item()  # Probability of toxic class
-   print(f"Toxicity: {toxicity_score}")
-   return toxicity_score
+    probabilities = torch.nn.functional.softmax(outputs.logits, dim=-1)
+    toxicity_score = probabilities[0][1].item()
+    print(f"Toxicity: {toxicity_score}")
+    return toxicity_score
 
 # Functie: Berekenen van de prioriteitsscore
 def calculate_priority_score(toxicity_score, category, found_keywords, text, neighborhood_score):
