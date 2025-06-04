@@ -16,10 +16,10 @@ def analyze_toxicity(text):
    inputs = tokenizer(text, return_tensors="pt", truncation=True, padding=True, max_length=512).to(model.device)
    with torch.no_grad():
         outputs = model(**inputs)
-    probabilities = torch.nn.functional.softmax(outputs.logits, dim=-1)
-    toxicity_score = probabilities[0][1].item()  # Probability of toxic class
-    print(f"Toxicity: {toxicity_score}")
-    return toxicity_score
+   probabilities = torch.nn.functional.softmax(outputs.logits, dim=-1)
+   toxicity_score = probabilities[0][1].item()  # Probability of toxic class
+   print(f"Toxicity: {toxicity_score}")
+   return toxicity_score
 
 # Functie: Berekenen van de prioriteitsscore
 def calculate_priority_score(toxicity_score, category, found_keywords, text, neighborhood_score):
