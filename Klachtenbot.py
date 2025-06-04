@@ -9,11 +9,11 @@ import torch
 
 # Laad het Nederlandse toxicity model
 tokenizer = AutoTokenizer.from_pretrained("ml6team/robbert-dutch-base-toxic-comments")
-model = AutoModelForSequenceClassification.from_pretrained("ml6team/robbert-dutch-base-toxic-comments").to("cpu")
+model = AutoModelForSequenceClassification.from_pretrained("ml6team/robbert-dutch-base-toxic-comments")
 
 # Functie: Analyseren van toxiciteit op basis van robBERT-model
 def analyze_toxicity(text):
-   inputs = tokenizer(text, return_tensors="pt", truncation=True, padding=True, max_length=512).to(model.device)
+   inputs = tokenizer(text, return_tensors="pt", truncation=True, padding=True, max_length=512)
    with torch.no_grad():
         outputs = model(**inputs)
    probabilities = torch.nn.functional.softmax(outputs.logits, dim=-1)
