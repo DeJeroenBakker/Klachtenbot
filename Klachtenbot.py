@@ -12,7 +12,7 @@ device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 # Laad het Nederlandse toxicity model
 tokenizer = AutoTokenizer.from_pretrained("ml6team/robbert-dutch-base-toxic-comments")
 model = AutoModelForSequenceClassification.from_pretrained("ml6team/robbert-dutch-base-toxic-comments")
-model.to_empty(device)  # This works only if model is loaded with real weights, not meta
+model.to_empty("cuda")  # This works only if model is loaded with real weights, not meta
 
 # Functie: Analyseren van toxiciteit op basis van robBERT-model
 def analyze_toxicity(text):
