@@ -1,3 +1,4 @@
+# Laad benodigde packages
 import streamlit as st
 import requests
 import numpy as np
@@ -14,7 +15,7 @@ tokenizer = AutoTokenizer.from_pretrained("ml6team/robbert-dutch-base-toxic-comm
 model = AutoModelForSequenceClassification.from_pretrained("ml6team/robbert-dutch-base-toxic-comments")
 model.to(device)  # This works only if model is loaded with real weights, not meta
 
-# Functie: Analyseren van toxiciteit op basis van robBERT-model
+# Functie: Analyseren van toxiciteit op basis van robBERT-model. Geeft een probability score tussen 0 en 1.
 def analyze_toxicity(text):
     inputs = tokenizer(text, return_tensors="pt", truncation=True, padding=True, max_length=512)
     inputs = {k: v.to(device) for k, v in inputs.items()}
@@ -25,7 +26,7 @@ def analyze_toxicity(text):
     print(f"Toxicity: {toxicity_score}")
     return toxicity_score
 
-# Functie: Berekenen van de prioriteitsscore
+# Functie: Berekenen van de prioriteitsscore op basis van toxicity score, categorie, keywords en wijkscore. Deze score wordt afgerond tussen 1 en 10.
 def calculate_priority_score(toxicity_score, category, found_keywords, text, neighborhood_score):
     base_score = 2
 
@@ -56,7 +57,7 @@ def calculate_priority_score(toxicity_score, category, found_keywords, text, nei
     final_score = max(1, min(round(base_score), 10))
     return final_score
 
-# Functie: Analyseer klacht
+# Functie: Analyseer klacht. Identificeert de categorie, 
 def analyze_complaint(text, updated_categories, neighborhood_score, tox_threshold=0.5):
     toxicity_score = analyze_toxicity(text)
     
@@ -93,7 +94,7 @@ def analyze_complaint(text, updated_categories, neighborhood_score, tox_threshol
 
 ###############################################
 
-# Definieer categorieën en trefwoorden
+# Definieer categorieën en bijbehorende trefwoorden. Trefwoorden kunnen door gebruiker worden aangepast in het zijpaneel.
 categories = {
     "Onbekend": [],
     
@@ -189,7 +190,7 @@ categories = {
 
 ###############################################
 
-# Lijst van Utrechtse wijken met prioriteitsscores
+# Lijst van Utrechtse wijken met prioriteitsscores tussen -2 en +2. Deze kunnen worden aangepast door de gebruiker in het zijpaneel.
 default_neighborhoods = {
     "Binnenstad": 0,
     "Lombok": 1,
@@ -216,6 +217,10 @@ default_neighborhoods = {
 }
 
 ################## STREAMLIT UI #############################
+
+# Onderstaande code stelt de Streamlit user interface in. Hierin wordt het uiterlijk van de pagina bepaalt, maar ook de opties voor de gebruiker om parameters van het algoritme aan te passen middels het zijpaneel. 
+# Deze aanpassingen zorgen voor veranderingen in de output van het algoritme. Bij het herladen van de pagina worden deze parameteraanpassingen én output gereset.
+
 
 st.set_page_config(
     page_title="Klachtenbot 1.0",
